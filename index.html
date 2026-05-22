@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Pagina de rifa dos formandos do terceiro ano com numeros selecionaveis, resumo da escolha e codigo Pix copia e cola."
+    />
+    <title>Rifa dos Formandos do 3º Ano</title>
+    <link rel="preload" href="assets/rifa-formandos-hero.png" as="image" />
+    <link rel="preload" href="assets/rifa-cartaz-referencia.jpeg" as="image" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header" data-header>
+      <a class="brand" href="#inicio" aria-label="Ir para o inicio da rifa">
+        <span class="brand-mark" aria-hidden="true">3A</span>
+        <span class="brand-copy">
+          <strong>Rifa Formandos</strong>
+          <small>Terceiro Ano</small>
+        </span>
+      </a>
+
+      <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" data-menu-toggle>
+        <span></span>
+        <span></span>
+      </button>
+
+      <nav class="site-nav" data-nav aria-label="Navegacao principal">
+        <a href="#numeros">Números</a>
+        <a href="#pix">Pix</a>
+        <a href="#cartaz">Cartaz</a>
+        <a href="#detalhes">Detalhes</a>
+        <a class="nav-cta" href="#numeros">Participar</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="raffle-stage" id="inicio" aria-labelledby="hero-title">
+        <div class="container raffle-workspace">
+          <section class="hero-copy reveal">
+            <p class="eyebrow">Rifa dos formandos</p>
+            <h1 id="hero-title">Concorra a um iPhone 13 e ajude a formatura.</h1>
+            <p>
+              Escolha seus números, copie o Pix e envie a confirmação para participar da ação entre formandos.
+            </p>
+
+            <dl class="hero-facts" aria-label="Resumo da rifa">
+              <div>
+                <dt data-ticket-price>R$ 5,00</dt>
+                <dd>por número</dd>
+              </div>
+              <div>
+                <dt data-raffle-total>35</dt>
+                <dd>números na rifa</dd>
+              </div>
+              <div>
+                <dt data-draw-date>A definir</dt>
+                <dd>data do sorteio</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="board-tool reveal" id="numeros" aria-labelledby="board-title">
+            <div class="tool-heading">
+              <div>
+                <p class="eyebrow">Escolha seus números</p>
+                <h2 id="board-title">Números da rifa</h2>
+              </div>
+              <span class="available-counter" data-available-counter>0 livres</span>
+            </div>
+
+            <div class="filter-bar" role="group" aria-label="Filtrar numeros da rifa">
+              <button class="filter-button is-active" type="button" data-filter="all">Todos</button>
+              <button class="filter-button" type="button" data-filter="available">Livres</button>
+              <button class="filter-button" type="button" data-filter="selected">Escolhidos</button>
+              <button class="filter-button" type="button" data-filter="reserved">Reservados</button>
+              <button class="filter-button" type="button" data-filter="sold">Vendidos</button>
+            </div>
+
+            <div class="number-grid" data-number-grid aria-live="polite"></div>
+
+            <div class="board-legend" aria-label="Legenda dos numeros">
+              <span><i class="legend-dot is-free"></i>Livre</span>
+              <span><i class="legend-dot is-selected"></i>Escolhido</span>
+              <span><i class="legend-dot is-reserved"></i>Reservado</span>
+              <span><i class="legend-dot is-sold"></i>Vendido</span>
+            </div>
+          </section>
+
+          <aside class="checkout-tool reveal" id="pix" aria-labelledby="checkout-title">
+            <div class="tool-heading">
+              <div>
+                <p class="eyebrow">Pagamento</p>
+                <h2 id="checkout-title">Pix da sua escolha</h2>
+              </div>
+            </div>
+
+            <label class="field">
+              Seu nome
+              <input type="text" data-buyer-name placeholder="Nome para confirmar a reserva" autocomplete="name" />
+            </label>
+
+            <div class="selected-box">
+              <span>Números escolhidos</span>
+              <div class="selected-list" data-selected-list>
+                <em>Nenhum número escolhido</em>
+              </div>
+            </div>
+
+            <div class="total-row">
+              <span>Total</span>
+              <strong data-selected-total>R$ 0,00</strong>
+            </div>
+
+            <div class="qr-panel" data-pix-qr-panel>
+              <div class="qr-code" data-pix-qrcode aria-label="QR Code Pix">
+                <span>QR Code Pix</span>
+              </div>
+              <p data-pix-qr-status>Selecione um número para gerar o QR Code Pix.</p>
+            </div>
+
+            <label class="field pix-code-field">
+              Pix copia e cola
+              <textarea data-pix-code readonly rows="5"></textarea>
+            </label>
+
+            <div class="pix-key">
+              <span>Chave Pix</span>
+              <strong data-pix-key>Configure no script.js</strong>
+            </div>
+
+            <div class="checkout-actions">
+              <button class="button button-primary" type="button" data-copy-pix disabled>Copiar Pix</button>
+              <a class="button button-whatsapp is-disabled" href="#" aria-disabled="true" data-whatsapp-link>
+                Confirmar no WhatsApp
+              </a>
+              <button class="button button-ghost" type="button" data-clear-selection disabled>Limpar escolha</button>
+            </div>
+
+            <p class="panel-status" role="status" aria-live="polite" data-panel-status>
+              Selecione um número livre para liberar o Pix.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="details-band" id="detalhes">
+        <div class="container details-layout">
+          <article class="detail-copy reveal">
+            <p class="eyebrow">Prêmio</p>
+            <h2 data-prize-title>Prêmio especial dos formandos</h2>
+            <p data-prize-description>
+              A comissão pode atualizar aqui o prêmio, a data do sorteio e as informações finais da entrega.
+            </p>
+
+            <ul class="raffle-meta" aria-label="Informações da rifa">
+              <li>
+                <span>Data</span>
+                <strong data-draw-date>25/09/2026</strong>
+              </li>
+              <li>
+                <span>Sorteio</span>
+                <strong data-draw-method>Sistema de cumbuca</strong>
+              </li>
+              <li>
+                <span>Local</span>
+                <strong data-raffle-location>Colégio Estadual José Alves de Assis</strong>
+              </li>
+            </ul>
+          </article>
+
+          <figure class="poster-frame reveal" id="cartaz">
+            <img
+              src="assets/rifa-cartaz-referencia.jpeg"
+              alt="Cartaz da ação entre formandos concorrendo a um iPhone 13 por R$ 20,00 o número."
+            />
+            <figcaption>Cartaz de referência da campanha.</figcaption>
+          </figure>
+        </div>
+
+        <div class="container steps-list" aria-label="Etapas da participacao">
+          <article class="step-card reveal">
+            <span>01</span>
+            <h3>Escolha</h3>
+            <p>Marque um ou mais números livres na tabela da rifa.</p>
+          </article>
+          <article class="step-card reveal">
+            <span>02</span>
+            <h3>Pague</h3>
+            <p>Copie o Pix exibido no painel da sua seleção.</p>
+          </article>
+          <article class="step-card reveal">
+            <span>03</span>
+            <h3>Confirme</h3>
+            <p>Envie o comprovante com seu nome e os números escolhidos.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-layout">
+        <a class="brand footer-brand" href="#inicio" aria-label="Voltar ao inicio">
+          <span class="brand-mark" aria-hidden="true">3A</span>
+          <span class="brand-copy">
+            <strong>Rifa Formandos</strong>
+            <small>Terceiro Ano</small>
+          </span>
+        </a>
+        <p>Pagina criada para arrecadacao da formatura do terceiro ano.</p>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
