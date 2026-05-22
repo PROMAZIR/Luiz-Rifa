@@ -1,8 +1,9 @@
 export const firebaseConfig = {
-  apiKey: "COLE_AQUI_API_KEY",
-  authDomain: "COLE_AQUI_PROJECT_ID.firebaseapp.com",
-  projectId: "COLE_AQUI_PROJECT_ID",
-  storageBucket: "COLE_AQUI_PROJECT_ID.appspot.com",
-  messagingSenderId: "COLE_AQUI_MESSAGING_SENDER_ID",
-  appId: "COLE_AQUI_APP_ID",
+  apiKey: "AIzaSyBdX2N-8POz7hfEcfKhgU-N94MrWf8Qp0Q",
+  authDomain: "rifa-luiz-3ano.firebaseapp.com",
+  projectId: "rifa-luiz-3ano",
+  storageBucket: "rifa-luiz-3ano.firebasestorage.app",
+  messagingSenderId: "331354764919",
+  appId: "1:331354764919:web:03f101995f930b70537872",
+  measurementId: "G-6L7HXSSN93",
 };
