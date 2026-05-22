@@ -40,6 +40,7 @@ const pendingCount = document.querySelector("[data-pending-count]");
 
 let currentUser = null;
 let unsubscribeOrders = null;
+let latestOrders = [];
 
 const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -63,6 +64,26 @@ const formatDate = (timestamp) => {
   return timestamp.toDate().toLocaleString("pt-BR");
 };
 
+const timestampToMillis = (timestamp) => {
+  if (!timestamp) return 0;
+  if (typeof timestamp.toMillis === "function") return timestamp.toMillis();
+  if (typeof timestamp.toDate === "function") return timestamp.toDate().getTime();
+  if (timestamp instanceof Date) return timestamp.getTime();
+  if (Number.isFinite(timestamp.seconds)) return timestamp.seconds * 1000;
+  return 0;
+};
+
+const getRemainingMs = (expiresAt) => Math.max(0, timestampToMillis(expiresAt) - Date.now());
+
+const formatCountdown = (milliseconds) => {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
+const isOrderActive = (order) => order.status === "pending" && getRemainingMs(order.expiresAt) > 0;
+
 const getOrderNumbers = (order) =>
   Object.keys(order.numberMap || {})
     .map(Number)
@@ -74,10 +95,11 @@ const updatePendingCount = (total) => {
 };
 
 const renderOrders = (orders) => {
+  const activeOrders = orders.filter(({ data }) => isOrderActive(data));
   orderList.innerHTML = "";
-  updatePendingCount(orders.length);
+  updatePendingCount(activeOrders.length);
 
-  if (!orders.length) {
+  if (!activeOrders.length) {
     const empty = document.createElement("p");
     empty.className = "empty-filter";
     empty.textContent = "Nenhum pagamento pendente no momento.";
@@ -85,7 +107,7 @@ const renderOrders = (orders) => {
     return;
   }
 
-  orders.forEach(({ id, data }) => {
+  activeOrders.forEach(({ id, data }) => {
     const article = document.createElement("article");
     article.className = "order-card";
 
@@ -114,6 +136,10 @@ const renderOrders = (orders) => {
     paymentHint.textContent =
       "Confira no app do banco se o Pix caiu no CPF 972.876.601-72 com o valor acima antes de confirmar.";
 
+    const countdown = document.createElement("p");
+    countdown.className = "order-countdown";
+    countdown.textContent = `Expira em ${formatCountdown(getRemainingMs(data.expiresAt))}`;
+
     const actions = document.createElement("div");
     actions.className = "order-actions";
 
@@ -130,7 +156,7 @@ const renderOrders = (orders) => {
     rejectButton.addEventListener("click", () => rejectOrder(id));
 
     actions.append(confirmButton, rejectButton);
-    article.append(header, numberList, paymentHint, actions);
+    article.append(header, numberList, countdown, paymentHint, actions);
     orderList.append(article);
   });
 };
@@ -159,7 +185,8 @@ const subscribeOrders = () => {
         return aTime - bTime;
       });
 
-      renderOrders(orders);
+      latestOrders = orders;
+      renderOrders(latestOrders);
       setStatus(`Conectado como ${currentUser.email || "admin"}.`);
     },
     () => {
@@ -186,23 +213,49 @@ const confirmOrder = async (orderId, order) => {
         throw new Error("Pedido já foi alterado.");
       }
 
-      const ticketRefs = numbers.map((number) => doc(db, "tickets", String(number)));
+      const orderData = orderSnapshot.data();
+      const currentNumbers = getOrderNumbers(orderData);
+
+      if (!currentNumbers.length || getRemainingMs(orderData.expiresAt) <= 0) {
+        throw new Error("O prazo de 30 minutos desse pedido acabou.");
+      }
+
+      const ticketRefs = currentNumbers.map((number) => doc(db, "tickets", String(number)));
+      const holdRefs = currentNumbers.map((number) => doc(db, "holds", String(number)));
       const ticketSnapshots = [];
+      const holdSnapshots = [];
 
       for (const ticketRef of ticketRefs) {
         ticketSnapshots.push(await transaction.get(ticketRef));
       }
 
+      for (const holdRef of holdRefs) {
+        holdSnapshots.push(await transaction.get(holdRef));
+      }
+
       ticketSnapshots.forEach((ticketSnapshot, index) => {
         if (ticketSnapshot.exists()) {
-          throw new Error(`Número ${numbers[index]} já está vendido.`);
+          throw new Error(`Número ${currentNumbers[index]} já está vendido.`);
+        }
+      });
+
+      holdSnapshots.forEach((holdSnapshot, index) => {
+        const hold = holdSnapshot.data();
+
+        if (
+          !holdSnapshot.exists() ||
+          hold.orderId !== orderId ||
+          hold.ownerId !== orderData.ownerId ||
+          getRemainingMs(hold.expiresAt) <= 0
+        ) {
+          throw new Error(`Número ${currentNumbers[index]} não está mais bloqueado para esse pedido.`);
         }
       });
 
       ticketRefs.forEach((ticketRef, index) => {
         transaction.set(ticketRef, {
-          number: numbers[index],
-          buyerName: String(order.buyerName || "Comprador").slice(0, 80),
+          number: currentNumbers[index],
+          buyerName: String(orderData.buyerName || "Comprador").slice(0, 80),
           status: "paid",
           amountCents: 2000,
           orderId,
@@ -211,6 +264,10 @@ const confirmOrder = async (orderId, order) => {
           confirmedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+      });
+
+      holdRefs.forEach((holdRef) => {
+        transaction.delete(holdRef);
       });
 
       transaction.update(orderRef, {
@@ -237,11 +294,28 @@ const rejectOrder = async (orderId) => {
         throw new Error("Pedido já foi alterado.");
       }
 
+      const orderData = orderSnapshot.data();
+      const currentNumbers = getOrderNumbers(orderData);
+      const holdRefs = currentNumbers.map((number) => doc(db, "holds", String(number)));
+      const holdSnapshots = [];
+
+      for (const holdRef of holdRefs) {
+        holdSnapshots.push(await transaction.get(holdRef));
+      }
+
       transaction.update(orderRef, {
         status: "rejected",
         adminId: currentUser.uid,
         rejectedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+
+      holdRefs.forEach((holdRef, index) => {
+        const hold = holdSnapshots[index].data();
+
+        if (holdSnapshots[index].exists() && hold.orderId === orderId && hold.ownerId === orderData.ownerId) {
+          transaction.delete(holdRef);
+        }
       });
     });
 
@@ -288,6 +362,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   if (!user) {
+    latestOrders = [];
     orderList.innerHTML = "";
     updatePendingCount(0);
     setStatus("Entre com sua conta Google admin.");
@@ -308,6 +383,7 @@ onAuthStateChanged(auth, async (user) => {
 
   if (!adminDoc.exists()) {
     ordersPanel.hidden = true;
+    latestOrders = [];
     updatePendingCount(0);
     setStatus(`Conta Google sem permissão de admin. UID: ${user.uid}`);
     return;
@@ -315,3 +391,9 @@ onAuthStateChanged(auth, async (user) => {
 
   subscribeOrders();
 });
+
+window.setInterval(() => {
+  if (currentUser && latestOrders.length) {
+    renderOrders(latestOrders);
+  }
+}, 1000);

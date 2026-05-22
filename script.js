@@ -2,6 +2,7 @@ import { firebaseConfig } from "./firebase-config.js";
 
 const raffleConfig = {
   ticketPrice: 20,
+  holdMinutes: 30,
   startNumber: 2766,
   endNumber: 2800,
   drawDate: "25/09/2026",
@@ -39,6 +40,8 @@ const reserveButton = document.querySelector("[data-reserve-selection]");
 const whatsAppLink = document.querySelector("[data-whatsapp-link]");
 const panelStatus = document.querySelector("[data-panel-status]");
 const firebaseStatus = document.querySelector("[data-firebase-status]");
+const paymentTimer = document.querySelector("[data-payment-timer]");
+const paymentCountdown = document.querySelector("[data-payment-countdown]");
 const filterButtons = document.querySelectorAll("[data-filter]");
 const availableCounter = document.querySelector("[data-available-counter]");
 const ticketPriceLabels = document.querySelectorAll("[data-ticket-price]");
@@ -58,9 +61,11 @@ const soldTicketMap = new Map(
 const soldNumbers = new Set(soldTicketMap.keys());
 const reservedNumbers = new Set(raffleConfig.reservedNumbers);
 let firestoreTicketMap = new Map();
+let firestoreHoldMap = new Map();
 let activeFilter = "all";
 let selectedNumbers = new Set();
 let currentPixCode = "";
+let localPaymentHold = null;
 const firebaseState = {
   app: null,
   auth: null,
@@ -68,6 +73,7 @@ const firebaseState = {
   user: null,
   ready: false,
   unsubscribeTickets: null,
+  unsubscribeHolds: null,
 };
 let firebaseApi = null;
 
@@ -76,25 +82,92 @@ const currency = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
+const holdDurationMs = raffleConfig.holdMinutes * 60 * 1000;
+
 const getTotalNumbers = () => raffleConfig.endNumber - raffleConfig.startNumber + 1;
 
 const formatNumber = (number) => String(number);
+
+const timestampToMillis = (timestamp) => {
+  if (!timestamp) return 0;
+  if (typeof timestamp.toMillis === "function") return timestamp.toMillis();
+  if (typeof timestamp.toDate === "function") return timestamp.toDate().getTime();
+  if (timestamp instanceof Date) return timestamp.getTime();
+  if (Number.isFinite(timestamp.seconds)) return timestamp.seconds * 1000;
+  return 0;
+};
+
+const getRemainingMs = (expiresAt) => Math.max(0, timestampToMillis(expiresAt) - Date.now());
+
+const formatCountdown = (milliseconds) => {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
 
 const isValidRaffleNumber = (number) =>
   Number.isInteger(number) && number >= raffleConfig.startNumber && number <= raffleConfig.endNumber;
 
 const getRemoteTicket = (number) => firestoreTicketMap.get(number);
 
+const isActiveHold = (hold) => hold?.status === "pending" && getRemainingMs(hold.expiresAt) > 0;
+
+const getRemoteHold = (number) => {
+  const hold = firestoreHoldMap.get(number);
+  return isActiveHold(hold) ? hold : null;
+};
+
+const isOwnHold = (hold) => Boolean(firebaseState.user?.uid && hold?.ownerId === firebaseState.user.uid);
+
+const getOwnActiveHoldEntries = () =>
+  [...firestoreHoldMap.entries()]
+    .filter(([, hold]) => isOwnHold(hold) && isActiveHold(hold))
+    .sort(([firstNumber], [secondNumber]) => firstNumber - secondNumber);
+
+const getActivePayment = () => {
+  const ownHoldEntries = getOwnActiveHoldEntries();
+
+  if (ownHoldEntries.length) {
+    return {
+      numbers: ownHoldEntries.map(([number]) => number),
+      expiresAtMs: Math.min(...ownHoldEntries.map(([, hold]) => timestampToMillis(hold.expiresAt))),
+      orderId: ownHoldEntries[0][1].orderId,
+    };
+  }
+
+  if (
+    localPaymentHold &&
+    localPaymentHold.expiresAtMs > Date.now() &&
+    localPaymentHold.numbers.every((number) => !getRemoteTicket(number))
+  ) {
+    return localPaymentHold;
+  }
+
+  return null;
+};
+
+const getCheckoutNumbers = () => {
+  const activePayment = getActivePayment();
+  const selection = getCheckoutNumbers();
+  return selection.length ? selection : getActivePayment()?.numbers || [];
+};
+
 const isUnavailableNumber = (number) =>
-  Boolean(getRemoteTicket(number)) || soldNumbers.has(number) || reservedNumbers.has(number);
+  Boolean(getRemoteTicket(number)) ||
+  Boolean(getRemoteHold(number)) ||
+  soldNumbers.has(number) ||
+  reservedNumbers.has(number);
 
 const getNumberStatus = (number) => {
   const remoteTicket = getRemoteTicket(number);
+  const remoteHold = getRemoteHold(number);
 
   if (remoteTicket) {
     return remoteTicket.status === "paid" || remoteTicket.status === "sold" ? "sold" : "reserved";
   }
 
+  if (remoteHold) return "reserved";
   if (soldNumbers.has(number)) return "sold";
   if (reservedNumbers.has(number)) return "reserved";
   if (selectedNumbers.has(number)) return "selected";
@@ -103,9 +176,14 @@ const getNumberStatus = (number) => {
 
 const getTicketBuyerName = (number) => {
   const remoteTicket = getRemoteTicket(number);
+  const remoteHold = getRemoteHold(number);
 
   if (remoteTicket?.buyerName) {
     return remoteTicket.buyerName;
+  }
+
+  if (remoteHold) {
+    return isOwnHold(remoteHold) ? `Pague em ${formatCountdown(getRemainingMs(remoteHold.expiresAt))}` : "Em conferência";
   }
 
   if (soldTicketMap.has(number)) {
@@ -214,8 +292,11 @@ const createNumberButton = (number) => {
 };
 
 const updateAvailableCounter = () => {
+  const activeHoldNumbers = [...firestoreHoldMap.entries()]
+    .filter(([, hold]) => isActiveHold(hold))
+    .map(([number]) => number);
   const unavailableNumbers = new Set(
-    [...soldNumbers, ...reservedNumbers, ...firestoreTicketMap.keys()].filter(isValidRaffleNumber)
+    [...soldNumbers, ...reservedNumbers, ...firestoreTicketMap.keys(), ...activeHoldNumbers].filter(isValidRaffleNumber)
   );
   const unavailableCount = unavailableNumbers.size;
   const selectedCount = selectedNumbers.size;
@@ -628,9 +709,10 @@ const renderPixQr = (pixCode) => {
 };
 
 const buildWhatsAppMessage = () => {
-  const selection = getSortedSelection().map(formatNumber).join(", ");
+  const checkoutNumbers = getCheckoutNumbers();
+  const selection = checkoutNumbers.map(formatNumber).join(", ");
   const name = buyerName.value.trim();
-  const total = currency.format(selectedNumbers.size * raffleConfig.ticketPrice);
+  const total = currency.format(checkoutNumbers.length * raffleConfig.ticketPrice);
 
   return [
     "Olá! Já paguei número(s) da Rifa dos Formandos do 3º Ano.",
@@ -649,11 +731,11 @@ const buildWhatsAppUrl = () =>
   `https://wa.me/${raffleConfig.whatsappNumber.replace(/\D/g, "")}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
 
 const updateWhatsAppLink = () => {
-  const hasSelection = selectedNumbers.size > 0;
-  whatsAppLink.href = hasSelection ? buildWhatsAppUrl() : "#";
-  whatsAppLink.classList.toggle("is-disabled", !hasSelection);
-  whatsAppLink.setAttribute("aria-disabled", String(!hasSelection));
-  whatsAppLink.tabIndex = hasSelection ? 0 : -1;
+  const hasNumbers = getCheckoutNumbers().length > 0;
+  whatsAppLink.href = hasNumbers ? buildWhatsAppUrl() : "#";
+  whatsAppLink.classList.toggle("is-disabled", !hasNumbers);
+  whatsAppLink.setAttribute("aria-disabled", String(!hasNumbers));
+  whatsAppLink.tabIndex = hasNumbers ? 0 : -1;
 };
 
 const updateSelectedList = () => {
@@ -670,29 +752,48 @@ const updateSelectedList = () => {
 
   selection.forEach((number) => {
     const chip = document.createElement("span");
-    chip.className = "selected-chip";
+    chip.className = `selected-chip${activePayment && !selectedNumbers.size ? " is-held" : ""}`;
     chip.textContent = formatNumber(number);
     selectedList.append(chip);
   });
 };
 
+const updatePaymentTimer = (activePayment) => {
+  if (!paymentTimer || !paymentCountdown) {
+    return;
+  }
+
+  if (!activePayment) {
+    paymentTimer.hidden = true;
+    return;
+  }
+
+  paymentTimer.hidden = false;
+  paymentCountdown.textContent = formatCountdown(activePayment.expiresAtMs - Date.now());
+};
+
 const updateCheckout = () => {
   const hasSelection = selectedNumbers.size > 0;
-  const selection = getSortedSelection();
-  const total = selectedNumbers.size * raffleConfig.ticketPrice;
-  currentPixCode = hasSelection ? buildPixPayload(total, selection) : "";
+  const activePayment = getActivePayment();
+  const checkoutNumbers = getCheckoutNumbers();
+  const hasCheckoutNumbers = checkoutNumbers.length > 0;
+  const total = checkoutNumbers.length * raffleConfig.ticketPrice;
+  currentPixCode = hasCheckoutNumbers ? buildPixPayload(total, checkoutNumbers) : "";
 
   updateSelectedList();
   selectedTotal.textContent = currency.format(total);
   pixTextarea.value = currentPixCode;
   pixKey.textContent = raffleConfig.pixKeyLabel;
-  copyPixButton.disabled = !hasSelection;
+  copyPixButton.disabled = !hasCheckoutNumbers;
   clearButton.disabled = !hasSelection;
   renderPixQr(currentPixCode);
+  updatePaymentTimer(activePayment);
   updateWhatsAppLink();
   updateReserveButton();
 
-  if (!hasSelection) {
+  if (activePayment && !hasSelection) {
+    panelStatus.textContent = "Números bloqueados por 30 minutos. Pague o Pix e aguarde o admin confirmar.";
+  } else if (!hasSelection) {
     panelStatus.textContent = "Selecione um número livre para liberar o Pix.";
   }
 };
@@ -714,10 +815,17 @@ const isFirebaseConfigured = () =>
 const updateReserveButton = () => {
   const hasSelection = selectedNumbers.size > 0;
   const hasName = buyerName.value.trim().length >= 2;
-  reserveButton.disabled = !(firebaseState.ready && hasSelection && hasName);
+  const activePayment = getActivePayment();
+  reserveButton.textContent = activePayment ? "Aguardando confirmação" : `Bloquear por ${raffleConfig.holdMinutes} min`;
+  reserveButton.disabled = !(firebaseState.ready && hasSelection && hasName && !activePayment);
 };
 
 const toggleNumber = (number) => {
+  if (getActivePayment() && !selectedNumbers.has(number)) {
+    setStatus("Você já tem números bloqueados. Finalize o pagamento ou aguarde o prazo terminar.");
+    return;
+  }
+
   if (isUnavailableNumber(number)) {
     setStatus(`Número ${formatNumber(number)} já está vendido ou em conferência.`);
     return;
@@ -806,6 +914,49 @@ const subscribeToTickets = () => {
   );
 };
 
+const subscribeToHolds = () => {
+  if (firebaseState.unsubscribeHolds) {
+    firebaseState.unsubscribeHolds();
+  }
+
+  firebaseState.unsubscribeHolds = firebaseApi.onSnapshot(
+    firebaseApi.collection(firebaseState.db, "holds"),
+    (snapshot) => {
+      const nextHolds = new Map();
+
+      snapshot.forEach((holdDoc) => {
+        const hold = holdDoc.data();
+        const number = Number(hold.number ?? holdDoc.id);
+
+        if (isValidRaffleNumber(number) && hold.status === "pending") {
+          nextHolds.set(number, {
+            ownerId: hold.ownerId,
+            orderId: hold.orderId,
+            status: hold.status,
+            expiresAt: hold.expiresAt,
+          });
+        }
+      });
+
+      if (
+        localPaymentHold &&
+        ![...nextHolds.values()].some((hold) => hold.orderId === localPaymentHold.orderId && isActiveHold(hold))
+      ) {
+        localPaymentHold = null;
+      }
+
+      firestoreHoldMap = nextHolds;
+      reconcileSelection();
+      renderNumberGrid();
+      updateCheckout();
+      setFirebaseStatus("Sistema de pedidos conectado.");
+    },
+    () => {
+      setFirebaseStatus("Não foi possível ler os bloqueios temporários. Verifique as regras do Firebase.");
+    }
+  );
+};
+
 const initFirebase = async () => {
   if (!isFirebaseConfigured()) {
     firebaseState.ready = false;
@@ -834,6 +985,7 @@ const initFirebase = async () => {
         onSnapshot: firestoreModule.onSnapshot,
         runTransaction: firestoreModule.runTransaction,
         serverTimestamp: firestoreModule.serverTimestamp,
+        Timestamp: firestoreModule.Timestamp,
       };
     }
 
@@ -848,6 +1000,7 @@ const initFirebase = async () => {
       if (user) {
         setFirebaseStatus("Usuário conectado. Pedidos protegidos por conta.");
         subscribeToTickets();
+        subscribeToHolds();
       } else {
         setFirebaseStatus("Conectando usuário...");
       }
@@ -867,6 +1020,7 @@ const reserveSelectedTickets = async () => {
   const selection = getSortedSelection();
   const name = buyerName.value.trim();
   const total = selection.length * raffleConfig.ticketPrice;
+  const activePayment = getActivePayment();
 
   if (!firebaseState.ready || !firebaseState.db || !firebaseState.user) {
     setStatus("Configure e conecte o Firebase antes de enviar o pedido.");
@@ -885,31 +1039,83 @@ const reserveSelectedTickets = async () => {
     return;
   }
 
+  if (activePayment) {
+    setStatus("Você já tem números bloqueados. Pague dentro do prazo ou aguarde liberar.");
+    return;
+  }
+
   const txid = buildPixTxid(selection);
   const numberMap = Object.fromEntries(selection.map((number) => [String(number), true]));
+  const expiresAtMs = Date.now() + holdDurationMs;
+  const expiresAt = firebaseApi.Timestamp.fromDate(new Date(expiresAtMs));
+  let createdOrderId = "";
 
   try {
-    await firebaseApi.addDoc(firebaseApi.collection(firebaseState.db, "orders"), {
-      buyerName: name.slice(0, 80),
-      ownerId: firebaseState.user.uid,
-      status: "pending",
-      numberMap,
-      numbersText: selection.map(formatNumber).join(", "),
-      ticketCount: selection.length,
-      amountCents: total * 100,
-      ticketPriceCents: raffleConfig.ticketPrice * 100,
-      txid,
-      createdAt: firebaseApi.serverTimestamp(),
-      updatedAt: firebaseApi.serverTimestamp(),
+    await firebaseApi.runTransaction(firebaseState.db, async (transaction) => {
+      const orderRef = firebaseApi.doc(firebaseApi.collection(firebaseState.db, "orders"));
+      const ticketRefs = selection.map((number) => firebaseApi.doc(firebaseState.db, "tickets", String(number)));
+      const holdRefs = selection.map((number) => firebaseApi.doc(firebaseState.db, "holds", String(number)));
+      const ticketSnapshots = [];
+      const holdSnapshots = [];
+
+      for (const ticketRef of ticketRefs) {
+        ticketSnapshots.push(await transaction.get(ticketRef));
+      }
+
+      for (const holdRef of holdRefs) {
+        holdSnapshots.push(await transaction.get(holdRef));
+      }
+
+      ticketSnapshots.forEach((ticketSnapshot, index) => {
+        if (ticketSnapshot.exists()) {
+          throw new Error(`Número ${formatNumber(selection[index])} já está vendido.`);
+        }
+      });
+
+      holdSnapshots.forEach((holdSnapshot, index) => {
+        if (holdSnapshot.exists() && isActiveHold(holdSnapshot.data())) {
+          throw new Error(`Número ${formatNumber(selection[index])} está bloqueado para pagamento.`);
+        }
+      });
+
+      createdOrderId = orderRef.id;
+
+      transaction.set(orderRef, {
+        buyerName: name.slice(0, 80),
+        ownerId: firebaseState.user.uid,
+        status: "pending",
+        numberMap,
+        numbersText: selection.map(formatNumber).join(", "),
+        ticketCount: selection.length,
+        amountCents: total * 100,
+        ticketPriceCents: raffleConfig.ticketPrice * 100,
+        txid,
+        expiresAt,
+        createdAt: firebaseApi.serverTimestamp(),
+        updatedAt: firebaseApi.serverTimestamp(),
+      });
+
+      holdRefs.forEach((holdRef, index) => {
+        transaction.set(holdRef, {
+          number: selection[index],
+          ownerId: firebaseState.user.uid,
+          orderId: createdOrderId,
+          status: "pending",
+          expiresAt,
+          createdAt: firebaseApi.serverTimestamp(),
+          updatedAt: firebaseApi.serverTimestamp(),
+        });
+      });
     });
 
+    localPaymentHold = { numbers: selection, expiresAtMs, orderId: createdOrderId };
     selectedNumbers.clear();
     saveSelection();
     renderNumberGrid();
     updateCheckout();
-    setStatus("Pedido enviado para conferência. O número só aparece vendido depois que o admin confirmar o pagamento.");
+    setStatus("Números bloqueados por 30 minutos. Pague o Pix e aguarde o admin confirmar.");
   } catch (error) {
-    setStatus(error.message || "Não foi possível enviar o pedido. Tente novamente.");
+    setStatus(error.message || "Não foi possível bloquear os números. Tente novamente.");
   }
 };
 
@@ -921,6 +1127,11 @@ updateCheckout();
 initFirebase();
 
 window.addEventListener("scroll", syncHeader, { passive: true });
+
+window.setInterval(() => {
+  renderNumberGrid();
+  updateCheckout();
+}, 1000);
 
 menuToggle.addEventListener("click", () => {
   const isOpen = nav.classList.toggle("is-open");
@@ -976,7 +1187,7 @@ clearButton.addEventListener("click", () => {
 });
 
 whatsAppLink.addEventListener("click", (event) => {
-  if (!selectedNumbers.size) {
+  if (!getCheckoutNumbers().length) {
     event.preventDefault();
   }
 });

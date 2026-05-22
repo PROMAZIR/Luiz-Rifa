@@ -401,6 +401,9 @@ button {
 .number-button.is-reserved {
   border-color: rgba(217, 81, 67, 0.22);
   background: #ffe9e4;
+  gap: 3px;
+  grid-template-rows: minmax(0, auto) auto;
+  padding: 5px;
 }
 
 .number-button.is-sold {
@@ -539,6 +542,11 @@ button {
   font-weight: 900;
 }
 
+.selected-chip.is-held {
+  color: var(--danger);
+  background: #ffe9e4;
+}
+
 .total-row {
   display: flex;
   align-items: center;
@@ -547,6 +555,34 @@ button {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   padding: 13px 0;
+}
+
+.payment-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(217, 81, 67, 0.2);
+  border-radius: var(--radius);
+  padding: 12px 13px;
+  color: var(--danger);
+  background: #fff1ed;
+}
+
+.payment-timer[hidden] {
+  display: none;
+}
+
+.payment-timer span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.payment-timer strong {
+  font-size: 1.35rem;
+  font-weight: 950;
 }
 
 .total-row strong {
@@ -1118,6 +1154,17 @@ button {
   font-weight: 800;
 }
 
+.order-countdown {
+  margin: 0;
+  border: 1px solid rgba(217, 81, 67, 0.22);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  color: var(--danger);
+  background: #fff1ed;
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
 .order-payment-hint {
   margin: 0;
   border: 1px solid var(--line);
@@ -1376,5 +1423,10 @@ button {
 
   .order-actions .button {
     width: 100%;
+  }
+
+  .payment-timer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

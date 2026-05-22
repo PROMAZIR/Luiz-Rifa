@@ -74,6 +74,12 @@ service cloud.firestore {
         && data.txid.matches('^[A-Z0-9]{1,25}$');
     }
 
+    function validThirtyMinuteExpiry(data) {
+      return data.expiresAt is timestamp
+        && data.expiresAt > request.time
+        && data.expiresAt <= request.time + duration.value(30, 'm');
+    }
+
     function validOrderCreate() {
       return request.resource.data.keys().hasOnly([
           'buyerName',
@@ -85,6 +91,7 @@ service cloud.firestore {
           'amountCents',
           'ticketPriceCents',
           'txid',
+          'expiresAt',
           'createdAt',
           'updatedAt'
         ])
@@ -106,6 +113,7 @@ service cloud.firestore {
         && request.resource.data.numbersText.size() >= 4
         && request.resource.data.numbersText.size() <= 250
         && validTxid(request.resource.data)
+        && validThirtyMinuteExpiry(request.resource.data)
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
     }
@@ -124,7 +132,8 @@ service cloud.firestore {
         && request.resource.data.adminId == request.auth.uid
         && (
           (request.resource.data.status == 'confirmed'
-            && request.resource.data.confirmedAt == request.time)
+            && request.resource.data.confirmedAt == request.time
+            && resource.data.expiresAt > request.time)
           || (request.resource.data.status == 'rejected'
             && request.resource.data.rejectedAt == request.time)
         )
@@ -136,7 +145,37 @@ service cloud.firestore {
         && request.resource.data.amountCents == resource.data.amountCents
         && request.resource.data.ticketPriceCents == resource.data.ticketPriceCents
         && request.resource.data.txid == resource.data.txid
+        && request.resource.data.expiresAt == resource.data.expiresAt
         && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validHoldWrite(holdId) {
+      return request.resource.data.keys().hasOnly([
+          'number',
+          'ownerId',
+          'orderId',
+          'status',
+          'expiresAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && ticketIdInRange(holdId)
+        && request.resource.data.number is int
+        && ticketIdMatchesNumber(holdId, request.resource.data.number)
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId is string
+        && request.resource.data.status == 'pending'
+        && request.resource.data.orderId is string
+        && request.resource.data.orderId.size() > 0
+        && request.resource.data.orderId.size() <= 80
+        && existsAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.ownerId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.status == 'pending'
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.expiresAt == request.resource.data.expiresAt
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.numberMap[holdId] == true
+        && validThirtyMinuteExpiry(request.resource.data)
+        && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
     }
 
@@ -179,6 +218,16 @@ service cloud.firestore {
       allow create: if signedIn() && validOrderCreate();
       allow update: if validAdminOrderUpdate();
       allow delete: if false;
+    }
+
+    match /holds/{holdId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && validHoldWrite(holdId);
+      allow update: if signedIn()
+        && resource.data.expiresAt is timestamp
+        && resource.data.expiresAt <= request.time
+        && validHoldWrite(holdId);
+      allow delete: if isAdmin();
     }
 
     match /tickets/{ticketId} {
