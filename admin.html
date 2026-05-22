@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin | Rifa dos Formandos</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="admin-page">
+    <main class="admin-shell">
+      <section class="admin-panel">
+        <div class="tool-heading">
+          <div>
+            <p class="eyebrow">Admin</p>
+            <h1>Conferir pagamentos</h1>
+          </div>
+        </div>
+
+        <form class="admin-login" data-admin-login>
+          <label class="field">
+            Email
+            <input type="email" data-admin-email autocomplete="email" required />
+          </label>
+          <label class="field">
+            Senha
+            <input type="password" data-admin-password autocomplete="current-password" required />
+          </label>
+          <button class="button button-primary" type="submit">Entrar</button>
+        </form>
+
+        <div class="admin-session" data-admin-session hidden>
+          <p data-admin-status>Conectando...</p>
+          <button class="button button-ghost" type="button" data-admin-logout>Sair</button>
+        </div>
+      </section>
+
+      <section class="admin-panel" data-admin-orders hidden>
+        <div class="tool-heading">
+          <div>
+            <p class="eyebrow">Pedidos</p>
+            <h2>Pagamentos em conferência</h2>
+          </div>
+        </div>
+        <div class="order-list" data-order-list></div>
+      </section>
+    </main>
+
+    <script type="module" src="admin.js"></script>
+  </body>
+</html>

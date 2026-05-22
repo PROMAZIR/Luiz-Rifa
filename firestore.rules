@@ -6,6 +6,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     function ticketIdInRange(ticketId) {
       return ticketId.matches('^(276[6-9]|27[7-9][0-9]|2800)$');
     }
@@ -48,62 +53,138 @@ service cloud.firestore {
         || (ticketId == '2800' && number == 2800);
     }
 
+    function allowedNumberKeys() {
+      return [
+        '2766', '2767', '2768', '2769', '2770', '2771', '2772',
+        '2773', '2774', '2775', '2776', '2777', '2778', '2779',
+        '2780', '2781', '2782', '2783', '2784', '2785', '2786',
+        '2787', '2788', '2789', '2790', '2791', '2792', '2793',
+        '2794', '2795', '2796', '2797', '2798', '2799', '2800'
+      ];
+    }
+
     function validBuyerName(data) {
       return data.buyerName is string
         && data.buyerName.size() >= 2
         && data.buyerName.size() <= 80;
     }
 
-    function validReservationId(data) {
-      return data.reservationId is string
-        && data.reservationId.matches('^[A-Z0-9]{1,25}$');
+    function validTxid(data) {
+      return data.txid is string
+        && data.txid.matches('^[A-Z0-9]{1,25}$');
     }
 
-    function validTicketCreate(ticketId) {
+    function validOrderCreate() {
       return request.resource.data.keys().hasOnly([
-          'number',
           'buyerName',
           'ownerId',
           'status',
+          'numberMap',
+          'numbersText',
+          'ticketCount',
           'amountCents',
-          'reservationId',
+          'ticketPriceCents',
+          'txid',
           'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId is string
+        && request.resource.data.status == 'pending'
+        && validBuyerName(request.resource.data)
+        && request.resource.data.numberMap is map
+        && request.resource.data.numberMap.keys().size() >= 1
+        && request.resource.data.numberMap.keys().size() <= 35
+        && request.resource.data.numberMap.keys().hasOnly(allowedNumberKeys())
+        && request.resource.data.ticketCount is int
+        && request.resource.data.amountCents is int
+        && request.resource.data.ticketPriceCents is int
+        && request.resource.data.ticketCount == request.resource.data.numberMap.keys().size()
+        && request.resource.data.ticketPriceCents == 2000
+        && request.resource.data.amountCents == request.resource.data.ticketCount * 2000
+        && request.resource.data.numbersText is string
+        && request.resource.data.numbersText.size() >= 4
+        && request.resource.data.numbersText.size() <= 250
+        && validTxid(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validAdminOrderUpdate() {
+      return isAdmin()
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'adminId',
+          'confirmedAt',
+          'rejectedAt',
+          'updatedAt'
+        ])
+        && request.resource.data.status in ['confirmed', 'rejected']
+        && request.resource.data.adminId == request.auth.uid
+        && (
+          (request.resource.data.status == 'confirmed'
+            && request.resource.data.confirmedAt == request.time)
+          || (request.resource.data.status == 'rejected'
+            && request.resource.data.rejectedAt == request.time)
+        )
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.buyerName == resource.data.buyerName
+        && request.resource.data.numberMap == resource.data.numberMap
+        && request.resource.data.numbersText == resource.data.numbersText
+        && request.resource.data.ticketCount == resource.data.ticketCount
+        && request.resource.data.amountCents == resource.data.amountCents
+        && request.resource.data.ticketPriceCents == resource.data.ticketPriceCents
+        && request.resource.data.txid == resource.data.txid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validTicketWrite(ticketId) {
+      return request.resource.data.keys().hasOnly([
+          'number',
+          'buyerName',
+          'status',
+          'amountCents',
+          'orderId',
+          'adminId',
+          'createdAt',
+          'confirmedAt',
           'updatedAt'
         ])
         && ticketIdInRange(ticketId)
         && request.resource.data.number is int
         && ticketIdMatchesNumber(ticketId, request.resource.data.number)
-        && request.resource.data.number >= 2766
-        && request.resource.data.number <= 2800
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.status == 'reserved'
+        && request.resource.data.status == 'paid'
+        && request.resource.data.amountCents is int
         && request.resource.data.amountCents == 2000
+        && request.resource.data.orderId is string
+        && request.resource.data.orderId.size() > 0
+        && request.resource.data.orderId.size() <= 80
+        && request.resource.data.adminId == request.auth.uid
         && validBuyerName(request.resource.data)
-        && validReservationId(request.resource.data)
         && request.resource.data.createdAt == request.time
+        && request.resource.data.confirmedAt == request.time
         && request.resource.data.updatedAt == request.time;
     }
 
-    function validOwnerNameUpdate() {
-      return resource.data.ownerId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'buyerName',
-          'updatedAt'
-        ])
-        && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.number == resource.data.number
-        && request.resource.data.status == resource.data.status
-        && request.resource.data.amountCents == resource.data.amountCents
-        && request.resource.data.reservationId == resource.data.reservationId
-        && request.resource.data.createdAt == resource.data.createdAt
-        && validBuyerName(request.resource.data)
-        && request.resource.data.updatedAt == request.time;
+    match /admins/{adminId} {
+      allow read: if signedIn() && request.auth.uid == adminId;
+      allow write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if signedIn()
+        && (isAdmin() || resource.data.ownerId == request.auth.uid);
+      allow create: if signedIn() && validOrderCreate();
+      allow update: if validAdminOrderUpdate();
+      allow delete: if false;
     }
 
     match /tickets/{ticketId} {
       allow read: if signedIn();
-      allow create: if signedIn() && validTicketCreate(ticketId);
-      allow update: if signedIn() && validOwnerNameUpdate();
+      allow create: if isAdmin() && validTicketWrite(ticketId);
+      allow update: if false;
       allow delete: if false;
     }
 

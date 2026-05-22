@@ -849,6 +849,121 @@ button {
   transform: translateY(0);
 }
 
+.admin-page {
+  min-height: 100svh;
+  background: var(--paper);
+}
+
+.admin-shell {
+  display: grid;
+  gap: 18px;
+  width: min(1040px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 36px 0;
+}
+
+.admin-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(5, 18, 15, 0.12);
+}
+
+.admin-panel h1,
+.admin-panel h2 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+.admin-login {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-top: 18px;
+}
+
+.admin-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.admin-session p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-weight: 760;
+}
+
+.order-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.order-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--paper);
+}
+
+.order-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-card-header div {
+  display: grid;
+  gap: 3px;
+}
+
+.order-card-header strong {
+  font-size: 1.1rem;
+}
+
+.order-card-header span,
+.order-numbers {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.order-card-header b {
+  color: var(--green);
+  font-size: 1.2rem;
+}
+
+.order-numbers {
+  margin: 0;
+  font-weight: 800;
+}
+
+.order-payment-hint {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  color: var(--ink);
+  background: #fff7e8;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1054,5 +1169,13 @@ button {
 
   .footer-layout p {
     text-align: left;
+  }
+
+  .admin-login {
+    grid-template-columns: 1fr;
+  }
+
+  .order-card-header {
+    display: grid;
   }
 }

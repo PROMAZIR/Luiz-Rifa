@@ -113,7 +113,7 @@ const getTicketBuyerName = (number) => {
   }
 
   if (reservedNumbers.has(number)) {
-    return "Reservado";
+    return "Em conferência";
   }
 
   return "";
@@ -633,7 +633,7 @@ const buildWhatsAppMessage = () => {
   const total = currency.format(selectedNumbers.size * raffleConfig.ticketPrice);
 
   return [
-    "Olá! Quero reservar número(s) da Rifa dos Formandos do 3º Ano.",
+    "Olá! Já paguei número(s) da Rifa dos Formandos do 3º Ano.",
     name ? `Nome: ${name}` : "",
     `Número(s): ${selection}`,
     `Total: ${total}`,
@@ -719,7 +719,7 @@ const updateReserveButton = () => {
 
 const toggleNumber = (number) => {
   if (isUnavailableNumber(number)) {
-    setStatus(`Número ${formatNumber(number)} já está reservado.`);
+    setStatus(`Número ${formatNumber(number)} já está vendido ou em conferência.`);
     return;
   }
 
@@ -788,8 +788,7 @@ const subscribeToTickets = () => {
 
         if (isValidRaffleNumber(number)) {
           nextTickets.set(number, {
-            buyerName: String(ticket.buyerName || "Reservado").slice(0, 80),
-            ownerId: ticket.ownerId,
+            buyerName: String(ticket.buyerName || "Vendido").slice(0, 80),
             status: ticket.status || "reserved",
           });
         }
@@ -799,7 +798,7 @@ const subscribeToTickets = () => {
       reconcileSelection();
       renderNumberGrid();
       updateCheckout();
-      setFirebaseStatus("Sistema de reservas conectado.");
+      setFirebaseStatus("Sistema de pedidos conectado.");
     },
     () => {
       setFirebaseStatus("Não foi possível ler as reservas. Verifique as regras do Firebase.");
@@ -824,6 +823,7 @@ const initFirebase = async () => {
       ]);
 
       firebaseApi = {
+        addDoc: firestoreModule.addDoc,
         initializeApp: appModule.initializeApp,
         getAuth: authModule.getAuth,
         onAuthStateChanged: authModule.onAuthStateChanged,
@@ -846,7 +846,7 @@ const initFirebase = async () => {
       firebaseState.ready = Boolean(user);
 
       if (user) {
-        setFirebaseStatus("Usuário conectado. Reservas protegidas por conta.");
+        setFirebaseStatus("Usuário conectado. Pedidos protegidos por conta.");
         subscribeToTickets();
       } else {
         setFirebaseStatus("Conectando usuário...");
@@ -866,9 +866,10 @@ const initFirebase = async () => {
 const reserveSelectedTickets = async () => {
   const selection = getSortedSelection();
   const name = buyerName.value.trim();
+  const total = selection.length * raffleConfig.ticketPrice;
 
   if (!firebaseState.ready || !firebaseState.db || !firebaseState.user) {
-    setStatus("Configure e conecte o Firebase antes de reservar no sistema.");
+    setStatus("Configure e conecte o Firebase antes de enviar o pedido.");
     return;
   }
 
@@ -878,50 +879,37 @@ const reserveSelectedTickets = async () => {
   }
 
   if (name.length < 2) {
-    setStatus("Informe seu nome para registrar a reserva.");
+    setStatus("Informe seu nome para enviar o pedido.");
     buyerName.focus();
     updateReserveButton();
     return;
   }
 
-  const reservationId = buildPixTxid(selection);
+  const txid = buildPixTxid(selection);
+  const numberMap = Object.fromEntries(selection.map((number) => [String(number), true]));
 
   try {
-    await firebaseApi.runTransaction(firebaseState.db, async (transaction) => {
-      const refs = selection.map((number) => firebaseApi.doc(firebaseState.db, "tickets", String(number)));
-      const docs = [];
-
-      for (const ticketRef of refs) {
-        docs.push(await transaction.get(ticketRef));
-      }
-
-      docs.forEach((ticketSnapshot, index) => {
-        if (ticketSnapshot.exists()) {
-          throw new Error(`O número ${formatNumber(selection[index])} já foi reservado.`);
-        }
-      });
-
-      refs.forEach((ticketRef, index) => {
-        transaction.set(ticketRef, {
-          number: selection[index],
-          buyerName: name.slice(0, 80),
-          ownerId: firebaseState.user.uid,
-          status: "reserved",
-          amountCents: raffleConfig.ticketPrice * 100,
-          reservationId,
-          createdAt: firebaseApi.serverTimestamp(),
-          updatedAt: firebaseApi.serverTimestamp(),
-        });
-      });
+    await firebaseApi.addDoc(firebaseApi.collection(firebaseState.db, "orders"), {
+      buyerName: name.slice(0, 80),
+      ownerId: firebaseState.user.uid,
+      status: "pending",
+      numberMap,
+      numbersText: selection.map(formatNumber).join(", "),
+      ticketCount: selection.length,
+      amountCents: total * 100,
+      ticketPriceCents: raffleConfig.ticketPrice * 100,
+      txid,
+      createdAt: firebaseApi.serverTimestamp(),
+      updatedAt: firebaseApi.serverTimestamp(),
     });
 
     selectedNumbers.clear();
     saveSelection();
     renderNumberGrid();
     updateCheckout();
-    setStatus("Reserva registrada. Agora envie o comprovante pelo WhatsApp.");
+    setStatus("Pedido enviado para conferência. O número só aparece vendido depois que o admin confirmar o pagamento.");
   } catch (error) {
-    setStatus(error.message || "Não foi possível registrar a reserva. Tente novamente.");
+    setStatus(error.message || "Não foi possível enviar o pedido. Tente novamente.");
   }
 };
 
@@ -973,7 +961,7 @@ reserveButton.addEventListener("click", reserveSelectedTickets);
 copyPixButton.addEventListener("click", async () => {
   try {
     await copyText(currentPixCode);
-    setStatus("Pix copiado. Agora envie o comprovante para confirmar a reserva.");
+    setStatus("Pix copiado. Depois do pagamento, envie o pedido para conferência.");
   } catch {
     setStatus("Não foi possível copiar automaticamente. Selecione o código Pix e copie manualmente.");
   }
