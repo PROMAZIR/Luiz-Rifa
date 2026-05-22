@@ -851,53 +851,223 @@ button {
 
 .admin-page {
   min-height: 100svh;
-  background: var(--paper);
+  color: var(--ink);
+  background: #f8f4ea;
 }
 
 .admin-shell {
   display: grid;
-  gap: 18px;
-  width: min(1040px, calc(100vw - 32px));
+  gap: 16px;
+  width: min(920px, calc(100vw - 28px));
   margin: 0 auto;
-  padding: 36px 0;
+  padding: 24px 0 42px;
+}
+
+.admin-hero {
+  display: grid;
+  gap: 10px;
+  padding: 8px 2px 4px;
+}
+
+.admin-back-link {
+  width: max-content;
+  color: var(--ink-soft);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.admin-back-link:hover {
+  color: var(--gold-dark);
+}
+
+.admin-hero h1 {
+  max-width: 620px;
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 2.8rem;
+  line-height: 1;
+}
+
+.admin-lede {
+  max-width: 680px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.admin-trust-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.admin-trust-list span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.admin-trust-list span::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  content: "";
 }
 
 .admin-panel {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 18px;
   background: #fff;
-  box-shadow: 0 18px 55px rgba(5, 18, 15, 0.12);
+  box-shadow: 0 18px 48px rgba(5, 18, 15, 0.1);
+}
+
+.admin-panel[data-admin-orders] {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .admin-panel h1,
 .admin-panel h2 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.8rem;
   line-height: 1.05;
 }
 
-.admin-login {
+.admin-login-copy {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  align-items: end;
-  margin-top: 18px;
+  gap: 5px;
+  margin-bottom: 16px;
 }
 
-.admin-session {
+.admin-login-copy p:not(.eyebrow) {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.google-login-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: min(100%, 360px);
+  min-height: 50px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 18px;
+  color: var(--ink);
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(5, 18, 15, 0.08);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.google-login-button:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+.google-login-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
+
+.google-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: #4285f4;
+  background: #fff;
+  font-weight: 950;
+}
+
+.admin-status {
+  margin: 14px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.admin-session-card {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(5, 18, 15, 0.09);
 }
 
-.admin-session p {
-  margin: 0;
+.admin-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.admin-user div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-user strong,
+.admin-user span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user span {
   color: var(--ink-soft);
-  font-weight: 760;
+  font-size: 0.88rem;
+}
+
+.admin-orders-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.admin-orders-heading h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  line-height: 1.05;
+}
+
+.admin-count {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 0.84rem;
+  font-weight: 900;
 }
 
 .order-list {
@@ -912,7 +1082,8 @@ button {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 16px;
-  background: var(--paper);
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(5, 18, 15, 0.08);
 }
 
 .order-card-header {
@@ -953,7 +1124,7 @@ button {
   border-radius: var(--radius);
   padding: 10px;
   color: var(--ink);
-  background: #fff7e8;
+  background: #fff8e8;
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -1171,11 +1342,39 @@ button {
     text-align: left;
   }
 
-  .admin-login {
-    grid-template-columns: 1fr;
+  .admin-shell {
+    width: min(100vw - 20px, 920px);
+    padding: 14px 0 24px;
+  }
+
+  .admin-hero h1 {
+    font-size: 2.05rem;
+  }
+
+  .admin-panel,
+  .admin-session-card,
+  .order-card {
+    padding: 14px;
+  }
+
+  .google-login-button {
+    width: 100%;
+  }
+
+  .admin-session-card,
+  .admin-orders-heading {
+    display: grid;
+  }
+
+  .admin-session-card .button {
+    width: 100%;
   }
 
   .order-card-header {
     display: grid;
+  }
+
+  .order-actions .button {
+    width: 100%;
   }
 }

@@ -8,38 +8,53 @@
   </head>
   <body class="admin-page">
     <main class="admin-shell">
-      <section class="admin-panel">
-        <div class="tool-heading">
-          <div>
-            <p class="eyebrow">Admin</p>
-            <h1>Conferir pagamentos</h1>
-          </div>
-        </div>
-
-        <form class="admin-login" data-admin-login>
-          <label class="field">
-            Email
-            <input type="email" data-admin-email autocomplete="email" required />
-          </label>
-          <label class="field">
-            Senha
-            <input type="password" data-admin-password autocomplete="current-password" required />
-          </label>
-          <button class="button button-primary" type="submit">Entrar</button>
-        </form>
-
-        <div class="admin-session" data-admin-session hidden>
-          <p data-admin-status>Conectando...</p>
-          <button class="button button-ghost" type="button" data-admin-logout>Sair</button>
+      <section class="admin-hero">
+        <a class="admin-back-link" href="./index.html#numeros">Voltar para a rifa</a>
+        <p class="eyebrow">Painel seguro</p>
+        <h1>Confirmar pagamentos</h1>
+        <p class="admin-lede">
+          Entre com sua conta Google liberada no Firebase para conferir Pix recebidos e marcar números como vendidos.
+        </p>
+        <div class="admin-trust-list" aria-label="Segurança do painel">
+          <span>Login Google</span>
+          <span>UID autorizado</span>
+          <span>Confirmação manual</span>
         </div>
       </section>
 
+      <section class="admin-panel" data-admin-login>
+        <div class="admin-login-copy">
+          <p class="eyebrow">Acesso</p>
+          <h2>Entrar como admin</h2>
+          <p>Use a mesma conta Google cadastrada como admin no Firestore.</p>
+        </div>
+
+        <button class="google-login-button" type="button" data-google-login>
+          <span class="google-mark" aria-hidden="true">G</span>
+          Entrar com Google
+        </button>
+
+        <p class="admin-status" data-admin-status>Entre com sua conta Google admin.</p>
+      </section>
+
+      <section class="admin-session-card" data-admin-session hidden>
+        <div class="admin-user">
+          <img class="admin-avatar" src="" alt="" data-admin-avatar hidden />
+          <div>
+            <strong data-admin-name>Admin</strong>
+            <span data-admin-email>Conta Google</span>
+          </div>
+        </div>
+        <button class="button button-ghost" type="button" data-admin-logout>Sair</button>
+      </section>
+
       <section class="admin-panel" data-admin-orders hidden>
-        <div class="tool-heading">
+        <div class="admin-orders-heading">
           <div>
             <p class="eyebrow">Pedidos</p>
             <h2>Pagamentos em conferência</h2>
           </div>
+          <span class="admin-count" data-pending-count>0 pendentes</span>
         </div>
         <div class="order-list" data-order-list></div>
       </section>

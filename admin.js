@@ -1,9 +1,11 @@
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
+  GoogleAuthProvider,
   getAuth,
   onAuthStateChanged,
-  signInWithEmailAndPassword,
+  signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
@@ -19,15 +21,22 @@ import {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope("email");
+googleProvider.setCustomParameters({ prompt: "select_account" });
+auth.languageCode = "pt-BR";
 
-const loginForm = document.querySelector("[data-admin-login]");
-const emailInput = document.querySelector("[data-admin-email]");
-const passwordInput = document.querySelector("[data-admin-password]");
+const loginPanel = document.querySelector("[data-admin-login]");
+const googleLoginButton = document.querySelector("[data-google-login]");
 const sessionPanel = document.querySelector("[data-admin-session]");
 const ordersPanel = document.querySelector("[data-admin-orders]");
 const orderList = document.querySelector("[data-order-list]");
 const adminStatus = document.querySelector("[data-admin-status]");
+const adminName = document.querySelector("[data-admin-name]");
+const adminEmail = document.querySelector("[data-admin-email]");
+const adminAvatar = document.querySelector("[data-admin-avatar]");
 const logoutButton = document.querySelector("[data-admin-logout]");
+const pendingCount = document.querySelector("[data-pending-count]");
 
 let currentUser = null;
 let unsubscribeOrders = null;
@@ -39,6 +48,11 @@ const currency = new Intl.NumberFormat("pt-BR", {
 
 const setStatus = (message) => {
   adminStatus.textContent = message;
+};
+
+const setLoginBusy = (isBusy) => {
+  googleLoginButton.disabled = isBusy;
+  googleLoginButton.classList.toggle("is-loading", isBusy);
 };
 
 const formatDate = (timestamp) => {
@@ -55,8 +69,13 @@ const getOrderNumbers = (order) =>
     .filter(Number.isInteger)
     .sort((a, b) => a - b);
 
+const updatePendingCount = (total) => {
+  pendingCount.textContent = total === 1 ? "1 pendente" : `${total} pendentes`;
+};
+
 const renderOrders = (orders) => {
   orderList.innerHTML = "";
+  updatePendingCount(orders.length);
 
   if (!orders.length) {
     const empty = document.createElement("p");
@@ -73,13 +92,18 @@ const renderOrders = (orders) => {
     const numbers = getOrderNumbers(data);
     const header = document.createElement("div");
     header.className = "order-card-header";
-    header.innerHTML = `
-      <div>
-        <strong>${data.buyerName || "Sem nome"}</strong>
-        <span>${formatDate(data.createdAt)}</span>
-      </div>
-      <b>${currency.format((data.amountCents || 0) / 100)}</b>
-    `;
+
+    const buyerBlock = document.createElement("div");
+    const buyer = document.createElement("strong");
+    buyer.textContent = data.buyerName || "Sem nome";
+
+    const date = document.createElement("span");
+    date.textContent = formatDate(data.createdAt);
+    buyerBlock.append(buyer, date);
+
+    const amount = document.createElement("b");
+    amount.textContent = currency.format((data.amountCents || 0) / 100);
+    header.append(buyerBlock, amount);
 
     const numberList = document.createElement("p");
     numberList.className = "order-numbers";
@@ -136,9 +160,10 @@ const subscribeOrders = () => {
       });
 
       renderOrders(orders);
-      setStatus(`Conectado como ${currentUser.email}.`);
+      setStatus(`Conectado como ${currentUser.email || "admin"}.`);
     },
     () => {
+      updatePendingCount(0);
       setStatus("Sem permissão para ler pedidos. Adicione seu UID em admins/{uid} no Firestore.");
     }
   );
@@ -226,15 +251,25 @@ const rejectOrder = async (orderId) => {
   }
 };
 
-loginForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  setStatus("Entrando...");
+googleLoginButton.addEventListener("click", async () => {
+  setStatus("Abrindo login do Google...");
+  setLoginBusy(true);
 
   try {
-    await signInWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value);
-    passwordInput.value = "";
-  } catch {
-    setStatus("Falha no login. Confira email e senha.");
+    await signInWithPopup(auth, googleProvider);
+  } catch (error) {
+    if (error.code === "auth/popup-blocked" || error.code === "auth/operation-not-supported-in-this-environment") {
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
+
+    if (error.code === "auth/popup-closed-by-user") {
+      setStatus("Login cancelado. Toque em Entrar com Google para tentar novamente.");
+    } else {
+      setStatus("Não foi possível entrar com Google. Tente novamente.");
+    }
+  } finally {
+    setLoginBusy(false);
   }
 });
 
@@ -242,9 +277,10 @@ logoutButton.addEventListener("click", () => signOut(auth));
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
-  loginForm.hidden = Boolean(user);
+  loginPanel.hidden = Boolean(user);
   sessionPanel.hidden = !user;
   ordersPanel.hidden = !user;
+  setLoginBusy(false);
 
   if (unsubscribeOrders) {
     unsubscribeOrders();
@@ -253,14 +289,27 @@ onAuthStateChanged(auth, async (user) => {
 
   if (!user) {
     orderList.innerHTML = "";
-    setStatus("Entre com o usuário admin.");
+    updatePendingCount(0);
+    setStatus("Entre com sua conta Google admin.");
     return;
+  }
+
+  adminName.textContent = user.displayName || "Admin";
+  adminEmail.textContent = user.email || "Conta Google";
+
+  if (user.photoURL) {
+    adminAvatar.src = user.photoURL;
+    adminAvatar.hidden = false;
+  } else {
+    adminAvatar.hidden = true;
   }
 
   const adminDoc = await getDoc(doc(db, "admins", user.uid));
 
   if (!adminDoc.exists()) {
-    setStatus(`Usuário sem permissão de admin. UID: ${user.uid}`);
+    ordersPanel.hidden = true;
+    updatePendingCount(0);
+    setStatus(`Conta Google sem permissão de admin. UID: ${user.uid}`);
     return;
   }
 

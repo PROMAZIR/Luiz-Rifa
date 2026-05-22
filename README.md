@@ -5,7 +5,7 @@ Pagina da rifa dos formandos com numeros de 2766 ate 2800, Pix copia e cola, QR 
 ## Firebase
 
 1. Crie ou escolha um projeto no Firebase.
-2. Ative Authentication com login anonimo e email/senha.
+2. Ative Authentication com login anonimo e Google.
 3. Crie o Cloud Firestore.
 4. Cadastre um app Web no projeto e copie a configuracao para `firebase-config.js`.
 5. Publique as regras:
@@ -31,7 +31,8 @@ npx -y firebase-tools@latest deploy --only hosting --project SEU_PROJECT_ID
 
 ## Admin
 
-Crie um usuario admin no Firebase Authentication com email/senha.
+O painel usa login Google. Entre uma vez em `/admin.html` com a conta Google que sera admin. Se aparecer "sem permissao", copie o UID mostrado na tela.
+
 Depois, no Firestore, crie manualmente o documento:
 
 ```text
