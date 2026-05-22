@@ -1,0 +1,114 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ticketIdInRange(ticketId) {
+      return ticketId.matches('^(276[6-9]|27[7-9][0-9]|2800)$');
+    }
+
+    function ticketIdMatchesNumber(ticketId, number) {
+      return (ticketId == '2766' && number == 2766)
+        || (ticketId == '2767' && number == 2767)
+        || (ticketId == '2768' && number == 2768)
+        || (ticketId == '2769' && number == 2769)
+        || (ticketId == '2770' && number == 2770)
+        || (ticketId == '2771' && number == 2771)
+        || (ticketId == '2772' && number == 2772)
+        || (ticketId == '2773' && number == 2773)
+        || (ticketId == '2774' && number == 2774)
+        || (ticketId == '2775' && number == 2775)
+        || (ticketId == '2776' && number == 2776)
+        || (ticketId == '2777' && number == 2777)
+        || (ticketId == '2778' && number == 2778)
+        || (ticketId == '2779' && number == 2779)
+        || (ticketId == '2780' && number == 2780)
+        || (ticketId == '2781' && number == 2781)
+        || (ticketId == '2782' && number == 2782)
+        || (ticketId == '2783' && number == 2783)
+        || (ticketId == '2784' && number == 2784)
+        || (ticketId == '2785' && number == 2785)
+        || (ticketId == '2786' && number == 2786)
+        || (ticketId == '2787' && number == 2787)
+        || (ticketId == '2788' && number == 2788)
+        || (ticketId == '2789' && number == 2789)
+        || (ticketId == '2790' && number == 2790)
+        || (ticketId == '2791' && number == 2791)
+        || (ticketId == '2792' && number == 2792)
+        || (ticketId == '2793' && number == 2793)
+        || (ticketId == '2794' && number == 2794)
+        || (ticketId == '2795' && number == 2795)
+        || (ticketId == '2796' && number == 2796)
+        || (ticketId == '2797' && number == 2797)
+        || (ticketId == '2798' && number == 2798)
+        || (ticketId == '2799' && number == 2799)
+        || (ticketId == '2800' && number == 2800);
+    }
+
+    function validBuyerName(data) {
+      return data.buyerName is string
+        && data.buyerName.size() >= 2
+        && data.buyerName.size() <= 80;
+    }
+
+    function validReservationId(data) {
+      return data.reservationId is string
+        && data.reservationId.matches('^[A-Z0-9]{1,25}$');
+    }
+
+    function validTicketCreate(ticketId) {
+      return request.resource.data.keys().hasOnly([
+          'number',
+          'buyerName',
+          'ownerId',
+          'status',
+          'amountCents',
+          'reservationId',
+          'createdAt',
+          'updatedAt'
+        ])
+        && ticketIdInRange(ticketId)
+        && request.resource.data.number is int
+        && ticketIdMatchesNumber(ticketId, request.resource.data.number)
+        && request.resource.data.number >= 2766
+        && request.resource.data.number <= 2800
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'reserved'
+        && request.resource.data.amountCents == 2000
+        && validBuyerName(request.resource.data)
+        && validReservationId(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validOwnerNameUpdate() {
+      return resource.data.ownerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'buyerName',
+          'updatedAt'
+        ])
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.number == resource.data.number
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.amountCents == resource.data.amountCents
+        && request.resource.data.reservationId == resource.data.reservationId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validBuyerName(request.resource.data)
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    match /tickets/{ticketId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && validTicketCreate(ticketId);
+      allow update: if signedIn() && validOwnerNameUpdate();
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

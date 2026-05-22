@@ -132,6 +132,9 @@
             </div>
 
             <div class="checkout-actions">
+              <button class="button button-primary" type="button" data-reserve-selection disabled>
+                Reservar no sistema
+              </button>
               <button class="button button-primary" type="button" data-copy-pix disabled>Copiar Pix</button>
               <a class="button button-whatsapp is-disabled" href="#" aria-disabled="true" data-whatsapp-link>
                 Confirmar no WhatsApp
@@ -141,6 +144,9 @@
 
             <p class="panel-status" role="status" aria-live="polite" data-panel-status>
               Selecione um número livre para liberar o Pix.
+            </p>
+            <p class="firebase-status" role="status" aria-live="polite" data-firebase-status>
+              Conectando ao sistema de reservas...
             </p>
           </aside>
         </div>
@@ -213,6 +219,6 @@
       </div>
     </footer>
 
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
   </body>
 </html>

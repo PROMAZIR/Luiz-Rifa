@@ -675,12 +675,18 @@ button {
   box-shadow: none;
 }
 
-.panel-status {
+.panel-status,
+.firebase-status {
   min-height: 22px;
   margin: 0;
   color: var(--green);
   font-size: 0.86rem;
   font-weight: 820;
+}
+
+.firebase-status {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
 }
 
 .details-band {
